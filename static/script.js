@@ -1,31 +1,15 @@
-document.addEventListener("DOMContentLoaded", function () {
-    console.log("✅ JavaScript Loaded!");
+document.getElementById('uploadForm').onsubmit = async function (event) {
+    event.preventDefault();
 
-    document.getElementById("uploadForm").addEventListener("submit", function (event) {
-        event.preventDefault(); // Prevent page reload
+    let formData = new FormData();
+    formData.append("image1", document.getElementById("image1").files[0]);
+    formData.append("image2", document.getElementById("image2").files[0]);
 
-        let formData = new FormData(this);
-
-        // Log file names before sending
-        for (let pair of formData.entries()) {
-            console.log("Uploading:", pair[0], pair[1]);
-        }
-
-        fetch("/compare", {
-            method: "POST",
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log("📢 Server Response:", data);
-            let resultDiv = document.getElementById("result");
-
-            if (data.error) {
-                resultDiv.innerHTML = `<span class="error">${data.error}</span>`;
-            } else {
-                resultDiv.innerHTML = `<span class="success">${data.result}</span>`;
-            }
-        })
-        .catch(error => console.error("❌ Error:", error));
+    let response = await fetch("/verify", {
+        method: "POST",
+        body: formData
     });
-});
+
+    let result = await response.json();
+    document.getElementById("result").innerHTML = `<p>${result.message} <br> <b>Confidence:</b> ${result.confidence}%</p>`;
+};

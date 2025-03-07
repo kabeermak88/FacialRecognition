@@ -4,24 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Face Verification</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>🔍 Face Verification</h1>
-        <form id="uploadForm" enctype="multipart/form-data">
-            <label for="image1">📸 Select First Image:</label>
-            <input type="file" id="image1" name="image1" required>
-
-            <label for="image2">📸 Select Second Image:</label>
-            <input type="file" id="image2" name="image2" required>
-
-            <button type="submit">Compare Faces</button>
+        <h2>Face Verification System</h2>
+        <form id="uploadForm">
+            <label>Upload First Image:</label>
+            <input type="file" id="image1" name="image1" accept="image/*" required><br>
+            <label>Upload Second Image:</label>
+            <input type="file" id="image2" name="image2" accept="image/*" required><br>
+            <button type="submit">Verify</button>
         </form>
-
         <div id="result"></div>
     </div>
-    
-    <script src="/static/script.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

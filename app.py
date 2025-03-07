@@ -1,54 +1,71 @@
-from flask import Flask, render_template, request, jsonify
-import face_recognition
 import os
+import json
+import dlib
+import cv2
+import numpy as np
+from flask import Flask, request, render_template, jsonify
 
+# Initialize Flask app
 app = Flask(__name__)
 
-UPLOAD_FOLDER = "uploads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+# Paths to DLib models
+PREDICTOR_PATH = "shape_predictor_68_face_landmarks.dat"
+FACE_RECOGNITION_MODEL_PATH = "dlib_face_recognition_resnet_model_v1.dat"
 
-# Ensure upload directory exists
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+# Check if models exist
+for model in [PREDICTOR_PATH, FACE_RECOGNITION_MODEL_PATH]:
+    if not os.path.exists(model):
+        raise FileNotFoundError(f"Error: {model} not found! Place it in the project folder.")
 
-@app.route("/")
+# Load models
+detector = dlib.get_frontal_face_detector()
+sp = dlib.shape_predictor(PREDICTOR_PATH)
+facerec = dlib.face_recognition_model_v1(FACE_RECOGNITION_MODEL_PATH)
+
+# Function to process images
+def get_face_encoding(image_path):
+    img = cv2.imread(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    detections = detector(img)
+
+    if len(detections) == 0:
+        return None
+
+    shape = sp(img, detections[0])
+    return np.array(facerec.compute_face_descriptor(img, shape))
+
+# Routes
+@app.route('/')
 def index():
-    return render_template("index.html")
+    return render_template('index.html')
 
-@app.route("/compare", methods=["POST"])
-def compare_faces():
-    if "image1" not in request.files or "image2" not in request.files:
-        return jsonify({"error": "Both image files are required"}), 400
+@app.route('/verify', methods=['POST'])
+def verify():
+    file1 = request.files['image1']
+    file2 = request.files['image2']
 
-    file1 = request.files["image1"]
-    file2 = request.files["image2"]
+    file1_path = os.path.join("uploads", file1.filename)
+    file2_path = os.path.join("uploads", file2.filename)
+    
+    file1.save(file1_path)
+    file2.save(file2_path)
 
-    if file1.filename == "" or file2.filename == "":
-        return jsonify({"error": "Files must have valid names"}), 400
+    enc1 = get_face_encoding(file1_path)
+    enc2 = get_face_encoding(file2_path)
 
-    path1 = os.path.join(app.config["UPLOAD_FOLDER"], file1.filename)
-    path2 = os.path.join(app.config["UPLOAD_FOLDER"], file2.filename)
+    if enc1 is None or enc2 is None:
+        return jsonify({"status": "error", "message": "No face detected in one or both images."})
 
-    file1.save(path1)
-    file2.save(path2)
+    similarity = np.linalg.norm(enc1 - enc2)
+    confidence = max(100 - (similarity * 100), 0)  # Convert distance to confidence %
 
-    try:
-        image1 = face_recognition.load_image_file(path1)
-        image2 = face_recognition.load_image_file(path2)
+    result = "The two faces belong to the same person." if confidence > 50 else "Faces do not match."
+    
+    return jsonify({
+        "status": "success",
+        "message": result,
+        "confidence": round(confidence, 3)
+    })
 
-        encodings1 = face_recognition.face_encodings(image1)
-        encodings2 = face_recognition.face_encodings(image2)
-
-        # Check if faces are found
-        if len(encodings1) == 0 or len(encodings2) == 0:
-            return jsonify({"error": "No face detected in one or both images"}), 400
-
-        match = face_recognition.compare_faces([encodings1[0]], encodings2[0])[0]
-
-        return jsonify({"result": "✅ Match!" if match else "❌ No Match!"})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
